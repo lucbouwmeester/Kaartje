@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#101410">
+<title>Random Earth</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:system-ui,sans-serif;background:#101410;color:#fff}
+#map{position:absolute;inset:0}.panel{position:absolute;z-index:5;left:12px;right:12px;top:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#101410ed;border-radius:14px;backdrop-filter:blur(8px)}
+.title{font-weight:750;font-size:17px}#coords{font-size:11px;color:#c6d0c5;margin-top:3px}.top-actions{display:flex;gap:6px;align-items:center}
+button{border:0;border-radius:11px;padding:12px 10px;background:#f0f2e9;color:#152016;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation}button:disabled{opacity:.4}#menuButton{background:#30382f;color:white;font-size:21px;padding:7px 12px}#random{background:#c6f36b;color:#14200b;font-size:14px}
+.bottom{position:absolute;z-index:5;bottom:max(16px,env(safe-area-inset-bottom));left:12px;right:12px;display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:8px}.bottom button{padding:15px 6px}
+#menu{display:none;position:absolute;z-index:10;top:76px;right:12px;width:min(300px,calc(100vw - 24px));padding:10px;border-radius:14px;background:#101410f5;border:1px solid #414a40;box-shadow:0 8px 30px #0008;max-height:75vh;overflow:auto}#menu.open{display:block}
+.menu-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:13px 10px;background:transparent;color:white;text-align:left;border-radius:8px;font-weight:500;font-size:14px}.menu-item:active{background:#30382f}.menu-item input{width:19px;height:19px;accent-color:#c6f36b}.menu-note{padding:0 10px 8px;color:#b9c3b7;font-size:11px;line-height:1.4}.menu-divider{height:1px;background:#414a40;margin:5px 0}
+#message{position:absolute;z-index:6;top:88px;left:12px;right:12px;text-align:center;color:white;font-size:13px;text-shadow:0 1px 4px black;pointer-events:none}
+.panel-view{display:none;position:absolute;z-index:8;inset:0;background:#101410;color:white;overflow:auto;padding:18px 14px 30px}.panel-view.open{display:block}.view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}.view-head h2{font-size:20px;margin:0}.secondary{background:#30382f;color:white}.saved-item{display:grid;grid-template-columns:94px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid #394139;cursor:pointer}.thumb{width:94px;height:94px;object-fit:cover;border-radius:8px;background:#273027}.saved-item h3{font-size:15px;margin:2px 0 5px}.saved-item p{font-size:12px;color:#c5cec3;margin:3px 0;overflow-wrap:anywhere}.saved-item .item-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.saved-item .item-actions button{padding:7px 9px;font-size:11px}
+#paletteImage{width:min(100%,360px);aspect-ratio:1;object-fit:cover;border-radius:12px;background:#283329;display:block;margin:12px auto}#paletteSwatches{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:14px 0}.swatch{min-width:0;text-align:center;font-size:10px;color:#dce4d8}.swatch-color{height:50px;border-radius:7px;margin-bottom:5px;border:1px solid #ffffff22}.muted{color:#b9c3b7;font-size:12px;line-height:1.5}.form-field{width:100%;padding:11px;border-radius:9px;border:1px solid #536052;background:#202820;color:white;margin:5px 0 12px;font:inherit}.inline-buttons{display:flex;gap:8px;flex-wrap:wrap}.inline-buttons button{flex:1}.view-content{max-width:720px;margin:auto}.close-row{display:flex;gap:8px;align-items:center}.empty{padding:30px 10px;text-align:center;color:#c1cabe}
+@media(max-width:390px){.title{font-size:15px}#coords{font-size:10px}.top-actions button{font-size:12px}.saved-item{grid-template-columns:78px 1fr}.thumb{width:78px;height:78px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel"><div><div class="title">🌍 Random Earth</div><div id="coords">Loading map...</div></div><div class="top-actions"><button onclick="openGoogleMaps()">↗ Open</button><button id="menuButton" onclick="toggleMenu()" aria-label="Settings">⋮</button></div></div>
+<div id="menu">
+<label class="menu-item"><span>Include ocean locations</span><input id="oceanToggle" type="checkbox" onchange="setOceanMode(this.checked)"></label>
+<div class="menu-note">Off = land-biased random spots. Coastline mode also favours shorelines and islands.</div>
+<label class="menu-item"><span>Coastlines & tiny islands</span><input id="coastToggle" type="checkbox" onchange="setCoastMode(this.checked)"></label>
+<div class="menu-divider"></div>
+<button class="menu-item" onclick="openSavedPlaces()">📚 Saved places list <span id="savedCount">0</span></button>
+<button class="menu-item" onclick="addPin()">📍 Tag current location</button>
+<button class="menu-item" onclick="openPalette()">🎨 Extract colour palette</button>
+<button class="menu-item" onclick="togglePins()"><span id="pinsLabel">Hide saved pins</span><span>◉</span></button>
+<button class="menu-item" onclick="exportPins()">⇩ Export pins (KML)</button>
+<button class="menu-item" onclick="exportPinsJSON()">⇩ Export pins (JSON)</button>
+<button class="menu-item" onclick="importPins()">⇧ Import pins (JSON)</button>
+<div class="menu-divider"></div><div class="menu-note">Use the palette tool with a saved/uploaded image.</div>
+</div>
+<div id="message"></div>
+<div class="bottom"><button id="previous" onclick="goPrevious()">← Previous</button><button id="random" onclick="randomSpot()">✦ Random spot</button><button id="next" onclick="goNext()">Next →</button></div>
+
+<section id="savedView" class="panel-view"><div class="view-content"><div class="view-head"><h2>📚 Saved places</h2><button class="secondary" onclick="closeViews()">✕ Close</button></div><input id="placeSearch" class="form-field" placeholder="Search names, tags, comments..." oninput="renderSavedList()"><p class="muted">Square previews are generated from Google Maps Static Maps. Open a saved place to revisit it. Pins are stored in this browser; export JSON for backup.</p><div id="savedList"></div></div></section>
+
+<section id="paletteView" class="panel-view"><div class="view-content"><div class="view-head"><h2>🎨 Colour palette</h2><button class="secondary" onclick="closeViews()">✕ Close</button></div><p class="muted">Choose a saved place to use its satellite preview, or upload an image. Palette extraction reads pixels from the chosen image. Google Maps tiles themselves cannot reliably be sampled directly due to browser security restrictions.</p><label for="palettePlace" class="muted">Saved place</label><select id="palettePlace" class="form-field" onchange="paletteFromSavedPlace()"><option value="">Choose a saved place...</option></select><label for="paletteUpload" class="muted">Or upload a picture</label><input id="paletteUpload" class="form-field" type="file" accept="image/*" onchange="paletteFromUpload(event)"><img id="paletteImage" alt="Image used for palette" hidden><div id="paletteSwatches"></div><div class="inline-buttons"><button class="secondary" onclick="copyPalette()">Copy hex colours</button><button class="secondary" onclick="downloadPalette()">Download palette PNG</button></div><p id="paletteStatus" class="muted"></p><canvas id="paletteCanvas" hidden></canvas></div></section>
+
+<section id="pinView" class="panel-view"><div class="view-content"><div class="view-head"><h2>📍 Tag this place</h2><button class="secondary" onclick="closeViews()">✕ Close</button></div><label class="muted" for="pinName">Place name / tag</label><input id="pinName" class="form-field" maxlength="100" placeholder="e.g. strange coastline"><label class="muted" for="pinComment">Comment</label><textarea id="pinComment" class="form-field" rows="4" maxlength="1000" placeholder="Why do you want to remember it?"></textarea><p id="pinCoords" class="muted"></p><div class="inline-buttons"><button id="savePinButton" onclick="savePinFromForm()">Save pin</button><button class="secondary" onclick="closeViews()">Cancel</button></div></div></section>
+
+<script>
+let map, history=[], historyIndex=-1, landGeoJSON=null, oceanMode=false, coastMode=true, pinsVisible=true, pins=[], pinMarkers=[], selectedLocation=null, infoWindow=null, spotRequestId=0, paletteColors=[], editingPinId=null;
+const LAND_DATA_URL="https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson";
+const $=id=>document.getElementById(id);
+
+window.initMap=async function(){
+ try{
+  map=new google.maps.Map($("map"),{center:{lat:20,lng:0},zoom:3,mapTypeId:"hybrid",tilt:0,streetViewControl:false,mapTypeControl:false,fullscreenControl:false,gestureHandling:"greedy"});
+  infoWindow=new google.maps.InfoWindow();
+  map.addListener("click",e=>{selectedLocation={lat:e.latLng.lat(),lng:e.latLng.lng()};updateCoordinates(true)});
+  map.addListener("dragstart",()=>{selectedLocation=null;updateCoordinates()});
+  map.addListener("idle",()=>{if(!selectedLocation)updateCoordinates()});
+  try{
+   history=JSON.parse(localStorage.getItem("randomEarthHistory")||"[]");if(!Array.isArray(history))history=[];
+   let ix=Number(localStorage.getItem("randomEarthIndex"));historyIndex=history.length?Math.max(0,Math.min(Number.isInteger(ix)?ix:history.length-1,history.length-1)):-1;
+   pins=JSON.parse(localStorage.getItem("randomEarthPins")||"[]");if(!Array.isArray(pins))pins=[];
+   oceanMode=localStorage.getItem("randomEarthOceanMode")==="true";
+   coastMode=localStorage.getItem("randomEarthCoastMode")!=="false";
+   pinsVisible=localStorage.getItem("randomEarthPinsVisible")!=="false";
+  }catch(e){history=[];historyIndex=-1;pins=[]}
+  $("oceanToggle").checked=oceanMode;$("coastToggle").checked=coastMode;updatePinsLabel();updateSavedCount();renderPins();updateButtons();
+  $("message").textContent="Loading detailed land and island boundaries…";
+  const response=await fetch(LAND_DATA_URL);if(!response.ok)throw new Error("Land data unavailable");landGeoJSON=await response.json();
+  $("message").textContent="";
+  if(historyIndex>=0)showSpot(history[historyIndex]);else randomSpot();
+ }catch(e){$("message").textContent="Map or land data failed to load. Check internet/API key, then refresh."}
+};
+
+function toggleMenu(){$("menu").classList.toggle("open")}
+function closeMenu(){$("menu").classList.remove("open")}
+document.addEventListener("click",e=>{if(!$("menu").contains(e.target)&&!$("menuButton").contains(e.target))closeMenu()});
+function openView(id){closeMenu();["savedView","paletteView","pinView"].forEach(x=>$(x).classList.toggle("open",x===id))}
+function closeViews(){["savedView","paletteView","pinView"].forEach(x=>$(x).classList.remove("open"))}
+function setOceanMode(v){oceanMode=v;localStorage.setItem("randomEarthOceanMode",String(v))}
+function setCoastMode(v){coastMode=v;localStorage.setItem("randomEarthCoastMode",String(v))}
+
+function pointInRing(lng,lat,ring){
+ let inside=false;
+ for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+  const [xi,yi]=ring[i],[xj,yj]=ring[j];
+  if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/((yj-yi)||1e-12)+xi))inside=!inside;
+ }
+ return inside;
+}
+function pointInPolygon(lng,lat,rings){if(!rings?.length||!pointInRing(lng,lat,rings[0]))return false;for(let i=1;i<rings.length;i++)if(pointInRing(lng,lat,rings[i]))return false;return true}
+function isLand(lat,lng){
+ if(!landGeoJSON)return false;
+ for(const f of landGeoJSON.features||[]){const g=f.geometry;if(!g)continue;
+  if(g.type==="Polygon"&&pointInPolygon(lng,lat,g.coordinates))return true;
+  if(g.type==="MultiPolygon")for(const p of g.coordinates)if(pointInPolygon(lng,lat,p))return true;
+ }return false;
+}
+// Generate in batches and test candidates. Coast mode deliberately biases toward
+// near-coast points; tiny islands are represented better by the 1:10m data.
+function candidate(){
+ if(coastMode&&Math.random()<.48){
+  const features=landGeoJSON.features||[];
+  const f=features[Math.floor(Math.random()*features.length)];
+  const g=f?.geometry;
+  if(g){
+   let poly;
+   if(g.type==="Polygon")poly=g.coordinates;
+   else if(g.type==="MultiPolygon")poly=g.coordinates[Math.floor(Math.random()*g.coordinates.length)];
+   if(poly?.[0]?.length){
+    const ring=poly[0],p=ring[Math.floor(Math.random()*ring.length)];
+    const offset=(Math.random()-.5)*.7;
+    return {lat:Math.max(-85,Math.min(85,p[1]+offset)),lng:((p[0]+offset+540)%360)-180};
+   }
+  }
+ }
+ return {lat:Math.asin(2*Math.random()-1)*180/Math.PI,lng:Math.random()*360-180};
+}
+function randomSpot(){
+ if(!landGeoJSON){$("message").textContent="Land boundaries are still loading.";return}
+ let spot=null;
+ for(let i=0;i<5000;i++){
+  const c=candidate();
+  if(oceanMode||isLand(c.lat,c.lng)){spot={lat:+c.lat.toFixed(5),lng:+c.lng.toFixed(5),zoom:18,visited:new Date().toISOString()};break}
+ }
+ if(!spot){$("message").textContent="Couldn't find a suitable spot. Try again.";return}
+ history=history.slice(0,historyIndex+1);history.push(spot);if(history.length>200)history.shift();historyIndex=history.length-1;
+ selectedLocation=null;saveHistory();showSpot(spot);
+}
+function showSpot(spot){
+ if(!map)return;const request=++spotRequestId,loc={lat:spot.lat,lng:spot.lng},zoom=spot.zoom||18;
+ selectedLocation=null;map.setMapTypeId("hybrid");map.panTo(loc);map.setZoom(zoom);
+ $("coords").textContent=spot.lat.toFixed(5)+", "+spot.lng.toFixed(5);$("message").textContent="Checking imagery…";updateButtons();
+ if(google.maps.MaxZoomService){new google.maps.MaxZoomService().getMaxZoomAtLatLng(loc,r=>{if(request!==spotRequestId)return;if(r.status==="OK"&&r.zoom!=null)map.setZoom(Math.min(zoom,r.zoom));$("message").textContent=""})}else $("message").textContent="";
+}
+function goPrevious(){if(historyIndex<=0)return;historyIndex--;showSpot(history[historyIndex]);saveHistory()}
+function goNext(){if(historyIndex>=history.length-1)return;historyIndex++;showSpot(history[historyIndex]);saveHistory()}
+function saveHistory(){try{localStorage.setItem("randomEarthHistory",JSON.stringify(history));localStorage.setItem("randomEarthIndex",String(historyIndex))}catch(e){}updateButtons()}
+function updateButtons(){$("previous").disabled=historyIndex<=0;$("next").disabled=historyIndex>=history.length-1}
+function updateCoordinates(clicked=false){if(!map)return;const c=selectedLocation||{lat:map.getCenter().lat(),lng:map.getCenter().lng()};$("coords").textContent=(selectedLocation?"Selected: ":"")+c.lat.toFixed(5)+", "+c.lng.toFixed(5)}
+function openGoogleMaps(){if(!map)return;const c=selectedLocation||{lat:map.getCenter().lat(),lng:map.getCenter().lng()};window.open(`https://www.google.com/maps/@${c.lat},${c.lng},${map.getZoom()||15}z`,"_blank","noopener")}
+
+function addPin(pin=null){const c=pin?{lat:pin.lat,lng:pin.lng}:selectedLocation||{lat:map.getCenter().lat(),lng:map.getCenter().lng()};editingPinId=pin?.id||null;$("pinName").value=pin?.name||"";$("pinComment").value=pin?.comment||"";$("pinCoords").textContent=`Coordinates: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;$("pinView").dataset.lat=c.lat;$("pinView").dataset.lng=c.lng;openView("pinView")}
+function savePinFromForm(){
+ const lat=Number($("pinView").dataset.lat),lng=Number($("pinView").dataset.lng),name=$("pinName").value.trim(),comment=$("pinComment").value.trim();
+ if(!Number.isFinite(lat)||!Number.isFinite(lng)){alert("Select a map location first.");return}
+ if(!name){alert("Please enter a place name or tag.");return}
+ const now=new Date().toISOString();
+ if(editingPinId){const p=pins.find(p=>p.id===editingPinId);if(p){p.name=name;p.comment=comment;p.lat=lat;p.lng=lng;p.lastAccessed=now}}
+ else pins.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),name,comment,lat,lng,created:now,lastAccessed:now});
+ savePins();renderPins();updateSavedCount();closeViews();
+}
+function savePins(){try{localStorage.setItem("randomEarthPins",JSON.stringify(pins))}catch(e){alert("Couldn't save pins. Export a backup and clear some browser storage.")}}
+function updateSavedCount(){$("savedCount").textContent=pins.length}
+function togglePins(){pinsVisible=!pinsVisible;localStorage.setItem("randomEarthPinsVisible",String(pinsVisible));updatePinsLabel();renderPins();closeMenu()}
+function updatePinsLabel(){$("pinsLabel").textContent=pinsVisible?"Hide saved pins":"Show saved pins"}
+function renderPins(){
+ pinMarkers.forEach(m=>m.setMap(null));pinMarkers=[];if(!map||!pinsVisible)return;
+ pins.forEach(pin=>{const marker=new google.maps.Marker({map,position:{lat:pin.lat,lng:pin.lng},title:pin.name,label:{text:"★",color:"#152016",fontSize:"13px"},icon:{path:google.maps.SymbolPath.CIRCLE,scale:12,fillColor:"#c6f36b",fillOpacity:1,strokeColor:"#152016",strokeWeight:2}});
+ marker.addListener("click",()=>{pin.lastAccessed=new Date().toISOString();savePins();const wrap=document.createElement("div");wrap.style.cssText="color:#172017;max-width:220px";
+ const title=document.createElement("strong");title.textContent=pin.name;wrap.append(title);const p=document.createElement("p");p.textContent=pin.comment||"No comment";wrap.append(p);const coord=document.createElement("small");coord.textContent=`${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`;wrap.append(coord);
+ const edit=document.createElement("button");edit.textContent="Edit tag";edit.style.marginTop="8px";edit.onclick=()=>{infoWindow.close();addPin(pin)};wrap.append(edit);
+ infoWindow.setContent(wrap);infoWindow.open({map,anchor:marker});});pinMarkers.push(marker)});
+}
+function openSavedPlaces(){renderSavedList();openView("savedView")}
+function formatDate(s){if(!s)return"Unknown";const d=new Date(s);return Number.isNaN(+d)?"Unknown":d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})}
+function staticMapURL(pin){return "https://maps.googleapis.com/maps/api/staticmap?center="+encodeURIComponent(pin.lat+","+pin.lng)+"&zoom=11&size=180x180&scale=2&maptype=satellite&markers=color:lime%7C"+pin.lat+","+pin.lng+"&key="+encodeURIComponent(getApiKey())}
+function getApiKey(){const s=[...document.scripts].find(x=>x.src.includes("maps.googleapis.com/maps/api/js"));try{return new URL(s.src).searchParams.get("key")||""}catch(e){return""}}
+function renderSavedList(){
+ const list=$("savedList"),query=($("placeSearch").value||"").toLowerCase();list.replaceChildren();
+ const matches=pins.filter(p=>(p.name+" "+p.comment+" "+p.lat+" "+p.lng).toLowerCase().includes(query));
+ if(!matches.length){const d=document.createElement("div");d.className="empty";d.textContent=pins.length?"No matching saved places.":"No tagged places yet. Use ⋮ → Tag current location to save one.";list.append(d);return}
+ matches.slice().reverse().forEach(pin=>{
+  const item=document.createElement("article");item.className="saved-item";
+  const img=document.createElement("img");img.className="thumb";img.alt="Satellite overview of "+pin.name;img.loading="lazy";img.src=staticMapURL(pin);img.onerror=()=>{img.removeAttribute("src");img.alt="Thumbnail unavailable. Check Static Maps API and key restrictions.";img.style.padding="8px"};
+  const body=document.createElement("div"),h=document.createElement("h3");h.textContent=pin.name;body.append(h);
+  const comment=document.createElement("p");comment.textContent=pin.comment||"No comment";body.append(comment);
+  const date=document.createElement("p");date.textContent="Visited: "+formatDate(pin.lastAccessed||pin.created);body.append(date);
+  const coord=document.createElement("p");coord.textContent=pin.lat.toFixed(5)+", "+pin.lng.toFixed(5);body.append(coord);
+  const actions=document.createElement("div");actions.className="item-actions";
+  const visit=document.createElement("button");visit.textContent="Visit";visit.onclick=()=>{closeViews();map.panTo({lat:pin.lat,lng:pin.lng});map.setZoom(16);pin.lastAccessed=new Date().toISOString();savePins();updateCoordinates();};
+  const edit=document.createElement("button");edit.className="secondary";edit.textContent="Edit";edit.onclick=()=>addPin(pin);
+  const palette=document.createElement("button");palette.className="secondary";palette.textContent="Palette";palette.onclick=()=>{openPalette();$("palettePlace").value=pin.id;paletteFromSavedPlace()};
+  actions.append(visit,edit,palette);body.append(actions);item.append(img,body);item.addEventListener("click",e=>{if(e.target.tagName==="ARTICLE"||e.target===img||e.target===h){closeViews();map.panTo({lat:pin.lat,lng:pin.lng});map.setZoom(16)}});list.append(item);
+ });
+}
+function exportPins(){if(!pins.length){alert("No saved pins yet.");return}const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");const placemarks=pins.map(p=>`<Placemark><name>${esc(p.name)}</name><description>${esc(p.comment||"")}</description><Point><coordinates>${p.lng},${p.lat},0</coordinates></Point></Placemark>`).join("");downloadFile(`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Random Earth</name>${placemarks}</Document></kml>`,"random-earth-pins.kml","application/vnd.google-earth.kml+xml");closeMenu()}
+function exportPinsJSON(){if(!pins.length){alert("No saved pins yet.");return}downloadFile(JSON.stringify(pins,null,2),"random-earth-pins.json","application/json");closeMenu()}
+function importPins(){const input=document.createElement("input");input.type="file";input.accept=".json,application/json";input.onchange=async()=>{try{const data=JSON.parse(await input.files[0].text());if(!Array.isArray(data)||!data.every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)))throw Error();pins=pins.concat(data.map(p=>({...p,id:p.id||Date.now().toString(36)+Math.random().toString(36).slice(2)})));savePins();renderPins();updateSavedCount();alert("Pins imported.")}catch(e){alert("Could not import this JSON file.")}};input.click();closeMenu()}
+function downloadFile(content,name,type){const url=URL.createObjectURL(new Blob([content],{type})),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+
+function openPalette(){populatePaletteSelect();openView("paletteView")}
+function populatePaletteSelect(){const sel=$("palettePlace"),old=sel.value;sel.replaceChildren(new Option("Choose a saved place...",""));pins.forEach(p=>sel.add(new Option(p.name,p.id)));if(pins.some(p=>p.id===old))sel.value=old}
+function paletteFromSavedPlace(){
+ const pin=pins.find(p=>p.id===$("palettePlace").value);if(!pin)return;
+ const img=new Image();img.crossOrigin="anonymous";img.onload=()=>extractPalette(img,pin.name);
+ img.onerror=()=>{$("paletteStatus").textContent="Couldn't read the satellite preview. Upload a screenshot or image instead. The Google Static Maps API must be enabled for thumbnails."};
+ img.src=staticMapURL(pin);
+}
+function paletteFromUpload(event){const file=event.target.files?.[0];if(!file)return;const url=URL.createObjectURL(file),img=new Image();img.onload=()=>{extractPalette(img,file.name);URL.revokeObjectURL(url)};img.onerror=()=>{$("paletteStatus").textContent="Couldn't open that image.";URL.revokeObjectURL(url)};img.src=url}
+function extractPalette(img,label){
+ const canvas=$("paletteCanvas"),ctx=canvas.getContext("2d",{willReadFrequently:true}),size=100;canvas.width=size;canvas.height=size;
+ ctx.drawImage(img,0,0,size,size);let data;try{data=ctx.getImageData(0,0,size,size).data}catch(e){$("paletteStatus").textContent="This image blocks pixel access. Please upload a screenshot or image file.";return}
+ $("paletteImage").src=img.src;$("paletteImage").hidden=false;
+ const buckets=new Map();
+ for(let i=0;i<data.length;i+=16){const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];if(a<180)continue;
+  // Quantize colours into coarse RGB buckets; ignore near-black/white UI pixels.
+  const key=[r>>3,g>>3,b>>3].join(",");buckets.set(key,(buckets.get(key)||0)+1)}
+ const top=[...buckets.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([key])=>{const [r,g,b]=key.split(",").map(Number);return "#"+[r*8+4,g*8+4,b*8+4].map(v=>Math.min(255,v).toString(16).padStart(2,"0")).join("")});
+ paletteColors=top;$("paletteSwatches").replaceChildren();
+ top.forEach(color=>{const wrap=document.createElement("div");wrap.className="swatch";const block=document.createElement("div");block.className="swatch-color";block.style.background=color;block.title="Tap to copy "+color;block.onclick=()=>navigator.clipboard?.writeText(color);const labelEl=document.createElement("div");labelEl.textContent=color.toUpperCase();wrap.append(block,labelEl);$("paletteSwatches").append(wrap)});
+ $("paletteStatus").textContent=`Palette from: ${label}. Tap a swatch to copy its hex code.`;
+}
+function copyPalette(){if(!paletteColors.length){$("paletteStatus").textContent="Extract a palette first.";return}const text=paletteColors.join(", ");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(()=>$("paletteStatus").textContent="Copied: "+text).catch(()=>prompt("Copy these hex colours:",text));else prompt("Copy these hex colours:",text)}
+function downloadPalette(){if(!paletteColors.length){$("paletteStatus").textContent="Extract a palette first.";return}const c=document.createElement("canvas");c.width=500;c.height=100;const x=c.getContext("2d");paletteColors.forEach((col,i)=>{x.fillStyle=col;x.fillRect(i*100,0,100,100)});c.toBlob(blob=>{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download="random-earth-palette.png";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)})}
+
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD1IrAR_stwIHrj-jfyWqfTuogY6jbshRg&callback=initMap"></script>
+</body>
+</html>
